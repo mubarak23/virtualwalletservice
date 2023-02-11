@@ -12,29 +12,18 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
-import { DataSource } from 'typeorm';
 import { LoginUserDto } from './dto/login-user.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Post('/signup')
   async create(@Res() res, @Body() createUserDto: CreateUserDto) {
     try {
-      const { token, user, wallet } = await this.dataSource.transaction(
-        (manager) => {
-          return this.usersService
-            .withTransaction(manager)
-            .createUser(createUserDto);
-        },
+      const { token, user, wallet } = await this.usersService.createUser(
+        createUserDto,
       );
-      // const { token, user, wallet } = await this.usersService.createUser(
-      //   createUserDto,
-      // );
       return res.status(HttpStatus.CREATED).json({ token, user, wallet });
     } catch (error) {
       return res.status(HttpStatus.FORBIDDEN).json(error);

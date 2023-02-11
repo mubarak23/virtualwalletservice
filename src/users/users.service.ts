@@ -4,9 +4,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ModuleRef } from '@nestjs/core';
 import { Repository } from 'typeorm';
-import { TransactionFor } from 'nest-transact';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { sign } from 'jsonwebtoken';
@@ -17,15 +15,12 @@ import { LoginUserDto } from './dto/login-user.dto';
 import { WalletService } from 'src/wallet/wallet.service';
 
 @Injectable()
-export class UsersService extends TransactionFor {
+export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
     private readonly walletService: WalletService,
-    moduleRef: ModuleRef,
-  ) {
-    super(moduleRef);
-  }
+  ) {}
 
   async createUser(createUserDto: CreateUserDto) {
     const userExist = await this.usersRepository.findOneBy({
