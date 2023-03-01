@@ -11,13 +11,21 @@ import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { initializeCardPayment } from './dto/initialize-card-payment.dto';
 import { PaystackVirtualAccount } from './entities/paystack_virtual_account.entity';
 import { UsersService } from 'src/users/users.service';
+import { PaystackWebHooks } from './entities/paystack_webhook.entity';
+import { WalletService } from 'src/wallet/wallet.service';
+import { TransactionReferenceType } from 'src/wallet/enum/transaction-reference-type.enum';
+import { PaymentTransactionStatus } from 'src/wallet/enum/payment-transaction-status.enum';
+import { PaymentType } from 'src/wallet/enum/payment-type.enum';
 
 @Injectable()
 export class PaymentService {
   constructor(
     @InjectRepository(PaystackVirtualAccount)
     private PaystackVirtualAccountRepository: Repository<PaystackVirtualAccount>,
+    @InjectRepository(PaystackWebHooks)
+    private PaystackWebHookRepository: Repository<PaystackWebHooks>,
     private readonly userService: UsersService,
+    private readonly walletService: WalletService,
   ) {}
 
   getPaystackTransactionFeeMajor(amountMajor: number) {
@@ -184,6 +192,116 @@ export class PaymentService {
         'An error occurred with our payment provider. Please try again at a later time.',
       );
     }
+  }
+
+  saveWebHookPayment(paystackPayload: any) {
+    try {
+      const webhookSave = this.PaystackWebHookRepository.save({
+        uuid: uuidv4(),
+        paystackPayload,
+        isProcessed: false,
+      });
+      return webhookSave;
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'An error occurred with our payment provider. Please try again at a later time.',
+      );
+    }
+  }
+
+  checkPaystackTransaction = async (
+    paystackTransactionReference: string,
+  ): Promise<string> => {
+    const paystackApiSecretKey = process.env.PAYSTACK_SECRET_KEY;
+
+    const baseURL = `https://api.paystack.co/transaction/verify/${encodeURIComponent(
+      paystackTransactionReference,
+    )}`;
+
+    const headers = {
+      Authorization: `Bearer ${paystackApiSecretKey}`,
+      'content-type': 'application/json',
+      'cache-control': 'no-cache',
+    };
+
+    try {
+      const response: AxiosResponse<any> = await axios.get(baseURL, {
+        headers,
+      });
+
+      if (response.status < 200 || response.status >= 210 || !response.data) {
+        throw new Error('Sorry, verification failed! Please try again.');
+      }
+
+      const { currency, gateway_response, amount, requested_amount, status } =
+        response.data.data;
+      // const paystackReference = response.data.data.reference
+
+      return status;
+    } catch (e) {
+      throw new Error('Paystack verification failed');
+    }
+  };
+
+  async processAccountToWallet(req: any) {
+    const paystackDedicatedNuban =
+      await this.PaystackVirtualAccountRepository.findOne({
+        where: {
+          paystackCustomerId: `${req.body.data.customer.id}`,
+          bankAccountNumber: req.body.data.metadata.receiver_account_number,
+          bankName: req.body.data.metadata.receiver_bank,
+        },
+      });
+      
+    if (paystackDedicatedNuban) {
+      const transaction = await this.walletService.findTransactionByReference(
+        req.body.reference,
+      );
+
+      // if (
+      //   transaction &&
+      //   transaction.paymentStatus === PaymentTransactionStatus.PAID
+      // ) {
+      //   return true;
+      // }
+      const amountMinor = req.body.data.amount;
+      const userId = paystackDedicatedNuban.userId;
+      const sourceWallet = await this.walletService.findwalletByUserId(userId);
+      const walletBalanceMinorBefore = sourceWallet.walletBalanceMinor;
+      const transactionData = {
+        uuid: uuidv4(),
+        userId,
+        walletId: sourceWallet.id,
+        reference: req.body.data.reference,
+        transactionType: TransactionReferenceType.PAYSTACK,
+        paymentType: PaymentType.CREDIT,
+        amountMinor,
+        paymentStatus: PaymentTransactionStatus.UNPAID,
+        walletBalanceMinorBefore,
+        currency: 'NGN',
+        description: `${sourceWallet.currency}${
+          amountMinor / 100
+        } main wallet fund.`,
+      };
+
+      const saveTransaction = await this.walletService.createWalletTransaction(
+        transactionData,
+      );
+      const fundWallet = await this.walletService.processFundWalletTransaction(saveTransaction, sourceWallet)
+      return saveTransaction;
+    }
+    return true;
+  }
+
+  async updateWebhookTransaction(webhook: PaystackWebHooks) {
+    const updatePaystackWebook = {
+      isProcessed: true,
+    };
+    await this.PaystackWebHookRepository.update(
+      webhook.id,
+      updatePaystackWebook,
+    );
+    return true;
   }
 
   findAll() {

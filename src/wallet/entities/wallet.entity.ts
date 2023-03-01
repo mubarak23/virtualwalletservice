@@ -10,7 +10,7 @@ import { WalletType } from '../enum/wallet-type.enum';
 @Entity({ name: 'Wallet' })
 export class Wallet {
   @PrimaryGeneratedColumn()
-  id: string;
+  id: number;
 
   @Column('uuid')
   uuid: string;

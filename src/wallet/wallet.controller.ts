@@ -45,6 +45,21 @@ export class WalletController {
     return this.walletService.findOne(+id);
   }
 
+  @Roles('NORMAL')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Get('/transactions/:userId')
+  async fetchWalletsTransactions(@Req() req, @Res() res) {
+    const userId = req.params.userId;
+    try {
+      const transactions = await this.walletService.fetchWalletTransactions(
+        userId,
+      );
+      return res.status(HttpStatus.ACCEPTED).json({ transactions });
+    } catch (error) {
+      return res.status(HttpStatus.FORBIDDEN).json(error);
+    }
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateWalletDto: UpdateWalletDto) {
     return this.walletService.update(+id, updateWalletDto);

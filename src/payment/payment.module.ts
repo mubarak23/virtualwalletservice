@@ -7,6 +7,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PaystackTransferRecipient } from './entities/patstack_transfer_recipient.entity';
 import { PaystackVirtualAccount } from './entities/paystack_virtual_account.entity';
 import { UsersModule } from 'src/users/users.module';
+import { WalletModule } from 'src/wallet/wallet.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UsersModule } from 'src/users/users.module';
       PaystackVirtualAccount,
     ]),
     UsersModule,
+    WalletModule,
   ],
   controllers: [PaymentController],
   providers: [PaymentService],

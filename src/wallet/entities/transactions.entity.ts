@@ -28,6 +28,9 @@ export class Transactions {
   @Column({ default: TransactionReferenceType.PAYSTACK })
   transactionType: string;
 
+  @Column()
+  paymentType: string;
+
   @Column('decimal')
   amountMinor: number;
 
@@ -37,10 +40,10 @@ export class Transactions {
   @Column('decimal')
   walletBalanceMinorBefore: number;
 
-  @Column('decimal')
+  @Column({ type: 'decimal', nullable: true })
   walletBalanceMinorAfter: number;
 
-  @Column('date')
+  @Column({ type: 'date', nullable: true })
   paidAt: Date;
 
   @Column()
